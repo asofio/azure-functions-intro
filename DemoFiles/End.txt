@@ -1,0 +1,79 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.Extensions.Logging;
+
+using functionsintro.Models;
+
+using Newtonsoft.Json;
+using System.Linq;
+using System.Net.Http;
+using Azure.Messaging.ServiceBus;
+using Microsoft.Azure.Cosmos;
+
+namespace Sofio.Function
+{
+    public static class OrderPriceCalculator
+    {
+        private static HttpClient _httpClient = new HttpClient();
+
+        [FunctionName("OrderPriceCalculator")]
+        public static async Task Run(
+            [ServiceBusTrigger("InboundOrders", Connection = "ServiceBusConnectionString")] Order order,
+            [CosmosDB(
+                databaseName: "Tax",
+                collectionName: "SalesTax",
+                ConnectionStringSetting = "CosmosDBConnectionString",
+                Id = "5",
+                PartitionKey = "5")] SalesTax salesTax,
+            [ServiceBus("OrderResult", Connection = "ServiceBusConnectionString")] IAsyncCollector<OrderResult> sbOutput,
+            ILogger log)
+        {
+            // Calculate total price
+            decimal totalPrice = 0;
+            foreach (var item in order.Items)
+            {
+                totalPrice += item.Price * item.Quantity;
+            }
+
+            // Instantiate outbound OrderResult model
+            var orderResult = new OrderResult
+            {
+                TotalPrice = totalPrice,
+                Items = order.Items.Select(item => new OrderResultItem
+                {
+                    ItemId = item.ItemId,
+                    Price = item.Price,
+                    Quantity = item.Quantity
+                }).ToList()
+            };
+
+            try{
+                // Send OrderResult to Service Bus
+                // Query API to retrieve product name
+                foreach(var item in orderResult.Items) {
+                    var itemInfo = await _httpClient.GetAsync($"https://api.sampleapis.com/coffee/hot/{item.ItemId}");
+
+                    if(itemInfo.IsSuccessStatusCode) {
+                        var json = await itemInfo.Content.ReadAsStringAsync();
+                        var productResult = JsonConvert.DeserializeObject<ProductResult>(json);
+                        item.ProductName = productResult.title;
+                    }
+                    else {
+                        log.LogInformation($"Failed to pull product info for item {item.ItemId}");
+                    }
+                }
+            }
+            catch(Exception e) {
+                log.LogInformation(e.ToString());
+            }
+
+            sbOutput.AddAsync(orderResult).Wait();
+        }
+    }
+}

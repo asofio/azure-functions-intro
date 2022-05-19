@@ -1,0 +1,39 @@
+Update reading data from POST body:
+
+Replace HttpRequest with modelbinding to an Order.  Also mention that the HttpRequest object can still be received.
+
+Order order,.....
+
+return new OkObjectResult($"The sales tax for {salesTax.State} is {salesTax.Percentage}");
+
+Cosmos Input Binding:
+            [CosmosDB(
+                databaseName: "Tax",
+                collectionName: "SalesTax",
+                ConnectionStringSetting = "CosmosDBConnectionString",
+                Id = "{StateAbbreviation}",
+                PartitionKey = "{StateAbbreviation}")] SalesTax salesTax,
+
+
+Service Bus Output Binding:
+
+    Add parameter to function:
+    [ServiceBus("orderresult", Connection = "ServiceBusConnectionString")] IAsyncCollector<OrderResult> sbOutput,
+
+    To publish message:
+    await sbOutput.AddAsync(orderResult);
+
+Change to Service Bus Trigger:
+
+    [ServiceBusTrigger("InboundOrders", Connection = "ServiceBusConnectionString")] Order order,
+
+    Change Task<IAsyncResult> to Task
+
+    Remove http IAsyncResult.
+
+
+Best Practices Example:
+
+    Move HttpClient to be statically instantiated.
+
+    private static HttpClient _httpClient = new HttpClient();

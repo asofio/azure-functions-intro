@@ -1,0 +1,13 @@
+POST http://localhost:7071/api/OrderHandler HTTP/1.1
+content-type: application/json
+
+{
+    "stateAbbreviation": "OK",
+    "items": [
+        {
+            "itemId": "3",
+            "quantity": 1,
+            "price": 4.99
+        }
+    ]
+}
