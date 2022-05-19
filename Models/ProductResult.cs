@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace functionsintro.Models
+namespace FunctionsIntro.Models
 {
     public class ProductResult
     {

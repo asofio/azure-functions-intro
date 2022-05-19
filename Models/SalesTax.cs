@@ -1,4 +1,4 @@
-namespace functionsintro.Models
+namespace FunctionsIntro.Models
 {
     public class SalesTax
     {

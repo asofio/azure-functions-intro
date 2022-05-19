@@ -8,7 +8,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
-using functionsintro.Models;
+using FunctionsIntro.Models;
 
 using Newtonsoft.Json;
 using System.Linq;
@@ -16,7 +16,7 @@ using System.Net.Http;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Cosmos;
 
-namespace Sofio.Function
+namespace FunctionsIntro.Function
 {
     public static class OrderHandler
     {

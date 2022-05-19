@@ -7,9 +7,9 @@ using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using functionsintro.Models;
+using FunctionsIntro.Models;
 
-namespace Company.Function
+namespace FunctionsIntro.Function
 {
     public static class ServiceBusSender
     {
