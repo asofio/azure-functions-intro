@@ -16,7 +16,7 @@ using System.Net.Http;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Cosmos;
 
-namespace FunctionsIntro.Function
+namespace Sofio.Function
 {
     public static class OrderHandler
     {
