@@ -23,6 +23,8 @@ namespace Sofio.Function
         private const string CosmosDatabase = "Tax";
         private const string CosmosContainer = "SalesTax";
         private const string OutboundServiceBusQueue = "OrderResult";
+        private const string CosmosDBConnectionSetting = "CosmosDBConnectionString";
+        private const string ServiceBusConnectionSetting = "ServiceBusConnectionString";
 
         [FunctionName("OrderHandler")]
         public static async Task<IActionResult> Run(
@@ -34,7 +36,7 @@ namespace Sofio.Function
             Order order = JsonConvert.DeserializeObject<Order>(requestBody);
 
             // Read document from Cosmos DB
-            CosmosClient cosmosClient = new CosmosClient(Environment.GetEnvironmentVariable("CosmosDBConnectionString"));
+            CosmosClient cosmosClient = new CosmosClient(Environment.GetEnvironmentVariable(CosmosDBConnectionSetting));
             var db = cosmosClient.GetDatabase(CosmosDatabase);
             var container = db.GetContainer(CosmosContainer);
             var salesTaxResult = await container.ReadItemAsync<SalesTax>(order.StateAbbreviation, new PartitionKey(order.StateAbbreviation));
@@ -77,7 +79,7 @@ namespace Sofio.Function
             }
 
             // Send Message to Service Bus
-            ServiceBusClient serviceBusClient = new ServiceBusClient(Environment.GetEnvironmentVariable("ServiceBusConnectionString"));
+            ServiceBusClient serviceBusClient = new ServiceBusClient(Environment.GetEnvironmentVariable(ServiceBusConnectionSetting));
             var queueClient = serviceBusClient.CreateSender(OutboundServiceBusQueue);
             var message = new ServiceBusMessage(JsonConvert.SerializeObject(orderResult));
             message.ContentType = "application/json";
