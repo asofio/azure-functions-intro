@@ -8,7 +8,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
-using functionsintro.Models;
+using FunctionsIntro.Models;
 
 using Newtonsoft.Json;
 using System.Linq;
@@ -18,62 +18,61 @@ using Microsoft.Azure.Cosmos;
 
 namespace Sofio.Function
 {
-    public static class OrderPriceCalculator
+    public static class OrderHandler
     {
-        private static HttpClient _httpClient = new HttpClient();
+        private const string CosmosDatabase = "Tax";
+        private const string CosmosContainer = "SalesTax";
+        private const string OutboundServiceBusQueue = "OrderResult";
+        private const string CosmosDBConnectionSetting = "CosmosDBConnectionString";
+        private const string ServiceBusConnectionSetting = "ServiceBusConnectionString";
+        private static readonly HttpClient _httpClient = new HttpClient();
 
-        [FunctionName("OrderPriceCalculator")]
+        [FunctionName("OrderHandler")]
         public static async Task Run(
-            [ServiceBusTrigger("InboundOrders", Connection = "ServiceBusConnectionString")] Order order,
+            [ServiceBusTrigger("InboundOrders", Connection = ServiceBusConnectionSetting)] Order order,
             [CosmosDB(
-                databaseName: "Tax",
-                collectionName: "SalesTax",
-                ConnectionStringSetting = "CosmosDBConnectionString",
-                Id = "5",
-                PartitionKey = "5")] SalesTax salesTax,
-            [ServiceBus("OrderResult", Connection = "ServiceBusConnectionString")] IAsyncCollector<OrderResult> sbOutput,
+                databaseName: CosmosDatabase,
+                collectionName: CosmosContainer,
+                ConnectionStringSetting = CosmosDBConnectionSetting,
+                Id = "{StateAbbreviation}",
+                PartitionKey = "{StateAbbreviation}")] SalesTax salesTax,
+            [ServiceBus(OutboundServiceBusQueue, Connection = ServiceBusConnectionSetting)] IAsyncCollector<OrderResult> sbOutput,
             ILogger log)
         {
             // Calculate total price
             decimal totalPrice = 0;
             foreach (var item in order.Items)
-            {
                 totalPrice += item.Price * item.Quantity;
-            }
+
+            // Apply sales tax
+            totalPrice = totalPrice + (totalPrice * salesTax.Percentage);
 
             // Instantiate outbound OrderResult model
-            var orderResult = new OrderResult
-            {
-                TotalPrice = totalPrice,
-                Items = order.Items.Select(item => new OrderResultItem
-                {
-                    ItemId = item.ItemId,
-                    Price = item.Price,
-                    Quantity = item.Quantity
-                }).ToList()
-            };
+            var orderResult = new OrderResult { TotalPrice = totalPrice };
 
-            try{
-                // Send OrderResult to Service Bus
-                // Query API to retrieve product name
-                foreach(var item in orderResult.Items) {
-                    var itemInfo = await _httpClient.GetAsync($"https://api.sampleapis.com/coffee/hot/{item.ItemId}");
+            // Query API to retrieve product name
+            foreach(var item in order.Items) {
+                var itemInfo = await _httpClient.GetAsync($"https://api.sampleapis.com/coffee/hot/{item.ItemId}");
 
-                    if(itemInfo.IsSuccessStatusCode) {
-                        var json = await itemInfo.Content.ReadAsStringAsync();
-                        var productResult = JsonConvert.DeserializeObject<ProductResult>(json);
-                        item.ProductName = productResult.title;
-                    }
-                    else {
-                        log.LogInformation($"Failed to pull product info for item {item.ItemId}");
-                    }
+                if(itemInfo.IsSuccessStatusCode) {
+                    var json = await itemInfo.Content.ReadAsStringAsync();
+                    var productResult = JsonConvert.DeserializeObject<ProductResult>(json);
+                    
+                    orderResult.Items.Add(new OrderResultItem
+                    {
+                        ItemId = item.ItemId,
+                        ProductName = productResult.Title,
+                        Price = item.Price,
+                        Quantity = item.Quantity
+                    });
                 }
-            }
-            catch(Exception e) {
-                log.LogInformation(e.ToString());
+                else {
+                    log.LogInformation($"Failed to pull product info for item {item.ItemId}");
+                }
+
             }
 
-            sbOutput.AddAsync(orderResult).Wait();
+            await sbOutput.AddAsync(orderResult);
         }
     }
 }
