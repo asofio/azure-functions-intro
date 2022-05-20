@@ -7,10 +7,10 @@ Order order,.....
 return new OkObjectResult($"The sales tax for {salesTax.State} is {salesTax.Percentage}");
 
 Cosmos Input Binding:
-            [CosmosDB(
-                databaseName: "Tax",
-                collectionName: "SalesTax",
-                ConnectionStringSetting = "CosmosDBConnectionString",
+            [[CosmosDB(
+                databaseName: CosmosDatabase,
+                collectionName: CosmosContainer,
+                ConnectionStringSetting = CosmosDBConnectionSetting,
                 Id = "{StateAbbreviation}",
                 PartitionKey = "{StateAbbreviation}")] SalesTax salesTax,
 
@@ -18,14 +18,14 @@ Cosmos Input Binding:
 Service Bus Output Binding:
 
     Add parameter to function:
-    [ServiceBus("orderresult", Connection = "ServiceBusConnectionString")] IAsyncCollector<OrderResult> sbOutput,
+    [ServiceBus(OutboundServiceBusQueue, Connection = ServiceBusConnectionSetting)] IAsyncCollector<OrderResult> sbOutput,
 
     To publish message:
     await sbOutput.AddAsync(orderResult);
 
 Change to Service Bus Trigger:
 
-    [ServiceBusTrigger("InboundOrders", Connection = "ServiceBusConnectionString")] Order order,
+    [ServiceBusTrigger("InboundOrders", Connection = ServiceBusConnectionSetting)] Order order,
 
     Change Task<IAsyncResult> to Task
 
