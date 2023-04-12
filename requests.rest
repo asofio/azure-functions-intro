@@ -5,7 +5,7 @@ content-type: application/json
     "stateAbbreviation": "OK",
     "items": [
         {
-            "itemId": "3",
+            "itemId": "3", // This sample uses a publicly available sample REST API.  Valid itemIds are: 3, 4, 5, 6. Query this endpoint to see the latest data: https://api.sampleapis.com/coffee/iced
             "quantity": 1,
             "price": 4.99
         }

@@ -15,28 +15,31 @@ using System.Linq;
 using System.Net.Http;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Cosmos;
+using System.Collections.Generic;
 
 namespace Sofio.Function
 {
     public static class OrderHandler
     {
-        private const string CosmosDatabase = "Tax";
-        private const string CosmosContainer = "SalesTax";
-        private const string OutboundServiceBusQueue = "OrderResult";
+        private const string CosmosDatabase = "tax";
+        private const string CosmosContainer = "salesTax";
+        private const string OutboundServiceBusQueue = "orderresult";
         private const string CosmosDBConnectionSetting = "CosmosDBConnectionString";
         private const string ServiceBusConnectionSetting = "ServiceBusConnectionString";
-        private static readonly HttpClient _httpClient = new HttpClient();
+
+        private static HttpClient _httpClient = new HttpClient();
 
         [FunctionName("OrderHandler")]
         public static async Task Run(
-            [ServiceBusTrigger("InboundOrders", Connection = ServiceBusConnectionSetting)] Order order,
+            [ServiceBusTrigger("inboundorders", Connection = ServiceBusConnectionSetting)] Order order,
             [CosmosDB(
                 databaseName: CosmosDatabase,
                 collectionName: CosmosContainer,
                 ConnectionStringSetting = CosmosDBConnectionSetting,
                 Id = "{StateAbbreviation}",
-                PartitionKey = "{StateAbbreviation}")] SalesTax salesTax,
-            [ServiceBus(OutboundServiceBusQueue, Connection = ServiceBusConnectionSetting)] IAsyncCollector<OrderResult> sbOutput,
+                PartitionKey = "{StateAbbreviation}"        
+            )] SalesTax salesTax,
+            [ServiceBus(OutboundServiceBusQueue, Connection = ServiceBusConnectionSetting)] IAsyncCollector<OrderResult> outboundQueue,
             ILogger log)
         {
             // Calculate total price
@@ -52,12 +55,13 @@ namespace Sofio.Function
 
             // Query API to retrieve product name
             foreach(var item in order.Items) {
-                var itemInfo = await _httpClient.GetAsync($"https://api.sampleapis.com/coffee/hot/{item.ItemId}");
+                var itemInfo = await _httpClient.GetAsync($"https://api.sampleapis.com/coffee/iced");
 
                 if(itemInfo.IsSuccessStatusCode) {
                     var json = await itemInfo.Content.ReadAsStringAsync();
-                    var productResult = JsonConvert.DeserializeObject<ProductResult>(json);
-                    
+                    var productResults = JsonConvert.DeserializeObject<List<ProductResult>>(json);
+                    var productResult = productResults.FirstOrDefault(x => x.Id == item.ItemId);
+
                     orderResult.Items.Add(new OrderResultItem
                     {
                         ItemId = item.ItemId,
@@ -69,10 +73,9 @@ namespace Sofio.Function
                 else {
                     log.LogInformation($"Failed to pull product info for item {item.ItemId}");
                 }
-
             }
-
-            await sbOutput.AddAsync(orderResult);
+            
+            await outboundQueue.AddAsync(orderResult);
         }
     }
 }

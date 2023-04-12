@@ -15,14 +15,15 @@ using System.Linq;
 using System.Net.Http;
 using Azure.Messaging.ServiceBus;
 using Microsoft.Azure.Cosmos;
+using System.Collections.Generic;
 
 namespace Sofio.Function
 {
     public static class OrderHandler
     {
-        private const string CosmosDatabase = "Tax";
-        private const string CosmosContainer = "SalesTax";
-        private const string OutboundServiceBusQueue = "OrderResult";
+        private const string CosmosDatabase = "tax";
+        private const string CosmosContainer = "salesTax";
+        private const string OutboundServiceBusQueue = "orderresult";
         private const string CosmosDBConnectionSetting = "CosmosDBConnectionString";
         private const string ServiceBusConnectionSetting = "ServiceBusConnectionString";
 
@@ -57,12 +58,13 @@ namespace Sofio.Function
             using (var httpClient = new HttpClient()) {
 
                 foreach(var item in order.Items) {
-                    var itemInfo = await httpClient.GetAsync($"https://api.sampleapis.com/coffee/hot/{item.ItemId}");
+                    var itemInfo = await httpClient.GetAsync($"https://api.sampleapis.com/coffee/iced");
 
                     if(itemInfo.IsSuccessStatusCode) {
                         var json = await itemInfo.Content.ReadAsStringAsync();
-                        var productResult = JsonConvert.DeserializeObject<ProductResult>(json);
-                        
+                        var productResults = JsonConvert.DeserializeObject<List<ProductResult>>(json);
+                        var productResult = productResults.FirstOrDefault(x => x.Id == item.ItemId);
+
                         orderResult.Items.Add(new OrderResultItem
                         {
                             ItemId = item.ItemId,
@@ -85,7 +87,10 @@ namespace Sofio.Function
             message.ContentType = "application/json";
             await queueClient.SendMessageAsync(message);
         
-            return new OkObjectResult($"The sales tax for {salesTax.State} is {salesTax.Percentage}.");
+            return new OkObjectResult(new {
+                response = $"The sales tax for {salesTax.State} is {salesTax.Percentage}.",
+                payload = orderResult
+            });
         }
     }
 }
